@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>CSV 파일 업로드 및 다운로드</title>
+  </head>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f2f2f2;
+        margin: 0;
+        padding: 20px;
+      }
+
+      h1 {
+        color: #333;
+        margin-bottom: 20px;
+        text-align: center;
+      }
+
+      form {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      input[type="file"] {
+        margin-bottom: 10px;
+      }
+
+      button {
+        background-color: #4CAF50;
+        color: white;
+        padding: 20px 40px;
+        border: none;
+        cursor: pointer;
+        font-size: 18px;
+      }
+
+      #result {
+        margin-bottom: 20px;
+        text-align: center;
+      }
+
+      #progress {
+        font-weight: bold;
+        margin-bottom: 10px;
+        text-align: center;
+      }
+      #download-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      #download-link {
+        display: none;
+        margin-right: 10px;
+      }
+
+      .download-button {
+        background-color: #2196F3;
+      }
+
+      .download-button:hover {
+        background-color: #0b7dda;
+      }
+    </style>
+  <body>
+    <h1>CSV 파일 업로드 및 다운로드</h1>
+    <form>
+      <input type="file" id="csv-file" accept=".csv">
+      <br><br>
+      <button type="button" onclick="uploadCsv()">업로드</button>
+    </form>
+    <br><br>
+    <div id="result"></div>
+    <div id="progress"></div>
+    <div id="download-container">
+      <a id="download-link" style="display: none;" download>전처리된 파일 다운로드</a>
+      <button class="download-button" type="button" onclick="downloadPreprocessedFile()">다운로드</button>
+    </div>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.7.16.min.js"></script>
+
+    <script>
+      AWS.config.update({
+        region: 'ap-northeast-2', // AWS 지역을 입력해주세요.
+        credentials: new AWS.Credentials({
+          accessKeyId: 'AKIAUT3EITRXZAB3SWPW',
+          secretAccessKey: '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'
+        })
+      });
+
+      function uploadCsv() {
+        var file = document.getElementById('csv-file').files[0];
+        if (!file) {
+          alert('파일을 선택해주세요.');
+          return;
+        }
+        var s3 = new AWS.S3({
+          params: { Bucket: 'csvbucket4' } // 업로드할 S3 버킷 이름을 입력해주세요.
+        });
+        var key = 'uploads/' + file.name;
+        var progress = document.getElementById('progress');
+        s3.upload({
+          Key: key,
+          Body: file,
+          ContentType: 'text/csv'
+        })
+        .on('httpUploadProgress', function(event) {
+          var percent = Math.round((event.loaded / event.total) * 100);
+          progress.innerHTML = '진행 상황: ' + percent + '%';
+        })
+        .send(function(err, data) {
+          if (err) {
+            console.log(err);
+            $('#result').html('CSV 파일 업로드 실패: ' + err.message);
+          } else {
+            console.log(data);
+            $('#result').html('CSV 파일 업로드 완료: ' + data.Location);
+            $('#download-link').attr('key', key);
+            $('#download-link').show();
+          }
+        });
+      }
+
+      function downloadPreprocessedFile() {
+        var key = $('#download-link').attr('key');
+        if (!key) {
+          alert('전처리된 파일이 없습니다.');
+          return;
+        }
+        var s3 = new AWS.S3();
+        var params = {
+          Bucket: 'updatecsv4',
+          Key: 'preprocessed/' + key,
+          ResponseContentType: 'text/csv' // Content-Type 설정
+        };
+        s3.getSignedUrl('getObject', params, function(err, url) {
+          if (err) {
+            console.log(err);
+            $('#result').html('전처리된 파일 다운로드 실패: ' + err.message);
+          } else {
+            console.log(url);
+            var downloadLink = document.getElementById('download-link');
+            downloadLink.href = url;
+            downloadLink.click();
+          }
+        });
+      }
+    </script>
+  </body>
+</html>
